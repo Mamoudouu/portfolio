@@ -284,6 +284,23 @@ body::before {
 .haut:hover svg { animation: monte .6s cubic-bezier(.2, .8, .2, 1); }
 @keyframes monte { 40% { transform: translateY(-3px); } }
 
+/* Compteur de secrets */
+.compteur {
+  position: fixed; left: 50%; top: 1.25rem; z-index: 8;
+  display: grid; gap: .15rem; width: max-content; max-width: calc(100vw - 2rem);
+  padding: .75rem 1.1rem; border-radius: 12px;
+  border: 1px solid rgb(120 255 190 / .45);
+  background: rgb(10 14 18 / .9); color: var(--blanc);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  box-shadow: 0 0 2rem rgb(60 255 170 / .18);
+  font-size: .9rem; text-align: center;
+  translate: -50% -150%; opacity: 0; pointer-events: none;
+  transition: translate .5s cubic-bezier(.2, .8, .2, 1), opacity .4s;
+}
+.compteur.montre { translate: -50% 0; opacity: 1; }
+.compteur strong { font-weight: 700; background: linear-gradient(90deg, #3dffa0, #3dd8ff, #9a6bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.compteur span { color: var(--gris); font-size: .82rem; }
+
 /* Bouton d'autorisation du mouvement (iPhone) */
 .mouvement {
   position: fixed; left: 1rem; bottom: 1.25rem; z-index: 7;
@@ -320,4 +337,5 @@ body::before {
   .ligne > span, .chapeau, .indice { animation: none; }
   .voir, .courriel, .rail button span, .rail button i { transition: none; }
   .haut, .haut:hover svg { transition: none; animation: none; }
+  .compteur { transition: none; }
 }

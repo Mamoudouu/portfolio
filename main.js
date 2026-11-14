@@ -171,6 +171,43 @@ function reseau() { // IA : un petit réseau de neurones, couche par couche
   return g;
 }
 
+/* ---------- Formes secrètes ---------- */
+function initiales() { // « MC » échantillonné dans un canevas, puis transformé en points
+  const c = document.createElement('canvas'), L = 520, H = 220;
+  c.width = L; c.height = H;
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff';
+  x.font = `800 200px Archivo, "Helvetica Neue", Arial, sans-serif`;
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText('MC', L / 2, H / 2 + 10);
+  const px = x.getImageData(0, 0, L, H).data, pleins = [];
+  for (let j = 0; j < H; j += 2) for (let i = 0; i < L; i += 2) if (px[(j * L + i) * 4 + 3] > 128) pleins.push(i, j);
+  const out = new Float32Array(N * 3), n = pleins.length / 2, e = 4.6 / L;
+  for (let k = 0; k < N; k++) {
+    const q = ((Math.random() * n) | 0) * 2;
+    out[k * 3] = (pleins[q] - L / 2 + Math.random() * 2) * e;
+    out[k * 3 + 1] = -(pleins[q + 1] - H / 2 + Math.random() * 2) * e;
+    out[k * 3 + 2] = (Math.random() - 0.5) * 0.25;
+  }
+  return out;
+}
+
+function grille() { // une feuille Excel : lignes, colonnes, en-tête et quelques cellules remplies
+  const out = new Float32Array(N * 3), col = 7, lig = 9, Lg = 3.9, Ht = 2.8;
+  const remplies = [[1, 2], [3, 2], [2, 4], [5, 3], [4, 6], [1, 7], [6, 5]];
+  for (let k = 0; k < N; k++) {
+    const t = Math.random();
+    let x, y;
+    if (t < 0.32) { x = (((Math.random() * (col + 1)) | 0) / col - 0.5) * Lg; y = (Math.random() - 0.5) * Ht; }       // colonnes
+    else if (t < 0.64) { x = (Math.random() - 0.5) * Lg; y = (((Math.random() * (lig + 1)) | 0) / lig - 0.5) * Ht; } // lignes
+    else if (t < 0.82) { x = (Math.random() - 0.5) * Lg; y = Ht / 2 - Math.random() * (Ht / lig); }                    // en-tête
+    else { const [c, l] = remplies[(Math.random() * remplies.length) | 0];                                              // cellules
+      x = ((c + Math.random()) / col - 0.5) * Lg; y = (0.5 - (l + Math.random()) / lig) * Ht; }
+    out[k * 3] = x; out[k * 3 + 1] = y; out[k * 3 + 2] = (Math.random() - 0.5) * 0.08;
+  }
+  return out;
+}
+
 function formulaire() { // une feuille de papier devenue formulaire validé
   const g = new THREE.Group();
   g.add(m(new THREE.BoxGeometry(1.9, 2.5, 0.06), -0.2, 0.14, -0.3, 0.35)); // la pile derrière
@@ -235,6 +272,8 @@ function demarrer() {
   geo.setAttribute('aDe', formes[0].attr);
   geo.setAttribute('aVers', formes[1].attr);
   geo.setAttribute('aHasard', new THREE.BufferAttribute(hasard, 4));
+  geo.setAttribute('aSecA', formes[0].attr); // remplacés au moment d'un secret
+  geo.setAttribute('aSecB', formes[0].attr);
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 100);
 
   const U = {
@@ -247,6 +286,8 @@ function demarrer() {
     uSouris: { value: new THREE.Vector3(99, 99, 0) },
     uOnde: { value: new THREE.Vector3(0, 0, 99) }, uVitesse: { value: 0 },
     uAccent: { value: new THREE.Color(0xc8ff3e) },
+    uSecret: { value: 0 }, uSecK: { value: 0 }, uBrule: { value: 0 }, uSecEch: { value: 1 }, uSecPos: { value: new THREE.Vector3() },
+    uSecousse: { value: 0 }, uAurore: { value: 0 },
   };
 
   const mat = new THREE.ShaderMaterial({
@@ -255,9 +296,11 @@ function demarrer() {
       attribute vec3 aDe; attribute vec3 aVers; attribute vec4 aHasard;
       uniform float uMix, uTemps, uIntro, uTaille;
       uniform vec3 uPosA, uPosB, uSouris, uOnde;
-      uniform float uVitesse;
+      uniform float uVitesse, uSecret, uSecK, uBrule, uSecEch, uSecousse;
+      uniform vec3 uSecPos;
+      attribute vec3 aSecA; attribute vec3 aSecB;
       uniform float uRotA, uRotB, uVagueA, uVagueB, uEchA, uEchB, uEclatA, uEclatB;
-      varying float vAlpha; varying float vAccent;
+      varying float vAlpha; varying float vAccent; varying vec3 vAur;
 
       vec3 poser(vec3 p, float rot, float vague, vec3 pos, float ech) {
         // nappe : houle lente, comme des séries de données qui respirent
@@ -285,6 +328,17 @@ function demarrer() {
         p += dir * (1.0 - uIntro) * (1.0 - uIntro) * 9.0;        // rassemblement d'entrée
         p += dir * 0.02 * sin(uTemps * 1.4 + aHasard.x * 40.0);  // frémissement
 
+        // secrets : les points quittent la forme du projet pour une forme cachée
+        float ks = clamp(uSecK * 1.6 - aHasard.x * 0.6, 0.0, 1.0); ks = ks * ks * (3.0 - 2.0 * ks);
+        vec3 S = mix(aSecA, aSecB, ks);
+        S += dir * sin(ks * 3.14159) * 1.1;
+        S.y += uBrule * (0.4 + aHasard.y * 2.8);                 // la grille « brûle » : les points s'envolent
+        S.x += uBrule * (aHasard.z - 0.5) * 1.6;
+        S = S * uSecEch + uSecPos;
+        float kx = clamp(uSecret * 1.5 - aHasard.x * 0.5, 0.0, 1.0); kx = kx * kx * (3.0 - 2.0 * kx);
+        p = mix(p, S, kx) + dir * sin(kx * 3.14159) * 0.8;
+        p += dir * uSecousse * (1.5 + aHasard.y * 3.5);          // secousse du téléphone
+
         // la souris écarte les points
         vec2 d = p.xy - uSouris.xy;
         float f = exp(-dot(d, d) * 1.6);
@@ -308,16 +362,23 @@ function demarrer() {
         vAccent = step(0.88, aHasard.w);
         float loin = smoothstep(22.0, 9.0, -mv.z);
         float scintille = 0.82 + 0.3 * sin(uTemps * 2.6 + aHasard.w * 60.0);
-        vAlpha = mix(uEclatA, uEclatB, k) * loin * scintille * (0.42 + f * 1.2 + onde * 1.6 + vAccent * 0.4);
+        vAlpha = mix(mix(uEclatA, uEclatB, k), 1.0, kx) * loin * scintille * (0.42 + f * 1.2 + onde * 1.6 + vAccent * 0.4);
+
+        // aurore boréale : des voiles vert, turquoise et violet qui ondulent
+        float h = fract(p.y * 0.16 + p.x * 0.07 + sin(p.x * 0.5 + uTemps * 0.6) * 0.12 + uTemps * 0.05 + aHasard.w * 0.25);
+        vec3 vert = vec3(0.22, 1.0, 0.6), turquoise = vec3(0.15, 0.85, 1.0), violet = vec3(0.6, 0.35, 1.0), rose = vec3(1.0, 0.42, 0.78);
+        vAur = mix(mix(vert, turquoise, smoothstep(0.0, 0.35, h)), mix(violet, rose, smoothstep(0.7, 1.0, h)), smoothstep(0.35, 0.7, h));
       }`,
     fragmentShader: /* glsl */`
       uniform vec3 uAccent;
-      varying float vAlpha; varying float vAccent;
+      uniform float uAurore;
+      varying float vAlpha; varying float vAccent; varying vec3 vAur;
       void main() {
         float d = length(gl_PointCoord - 0.5);
         float a = smoothstep(0.5, 0.05, d);
         vec3 couleur = mix(vec3(0.86, 0.9, 1.0), uAccent, vAccent);
-        gl_FragColor = vec4(couleur, a * a * vAlpha);
+        couleur = mix(couleur, vAur, uAurore);
+        gl_FragColor = vec4(couleur, a * a * vAlpha * (1.0 + uAurore * 0.35));
       }`,
   });
   scene.add(new THREE.Points(geo, mat));
@@ -437,14 +498,18 @@ function demarrer() {
       b.className = 'mouvement';
       b.textContent = 'Activer le mouvement 3D';
       b.addEventListener('click', async () => {
+        // deux autorisations séparées : un refus de l'une ne bloque pas l'autre
+        try { if (await DeviceOrientationEvent.requestPermission() === 'granted') addEventListener('deviceorientation', incliner); } catch (err) { /* refusée */ }
         try {
-          if (await DeviceOrientationEvent.requestPermission() === 'granted') addEventListener('deviceorientation', incliner);
-        } catch (err) { /* refus ou indisponible : la page reste normale */ }
+          if (typeof DeviceMotionEvent?.requestPermission !== 'function') addEventListener('devicemotion', secouer);
+          else if (await DeviceMotionEvent.requestPermission() === 'granted') addEventListener('devicemotion', secouer);
+        } catch (err) { /* refusée */ }
         b.remove();
       });
       document.body.append(b);
     } else {
       addEventListener('deviceorientation', incliner);
+      addEventListener('devicemotion', secouer);
     }
   }
   let debutOnde = -99;
@@ -453,8 +518,119 @@ function demarrer() {
     const x = (e.clientX / innerWidth) * 2 - 1, y = -((e.clientY / innerHeight) * 2 - 1);
     U.uOnde.value.set(x * vueL * 0.5, y * vueH * 0.5, 0);
     debutOnde = horloge.elapsedTime;
+    aurore(0.9, 0);
   });
   let dernierY = scrollY;
+
+  /* ----- Aurore boréale : déclenchée par chaque action ----- */
+  let auroreTenue = 0;
+  function aurore(force, tenue) {
+    if (calme) return;
+    U.uAurore.value = Math.max(U.uAurore.value, force);
+    auroreTenue = Math.max(auroreTenue, tenue);
+  }
+
+  /* ----- Petits secrets pour les curieux ----- */
+  // Une file d'étapes : chaque étape amène des uniformes vers une valeur en un temps donné.
+  let etapes = [], enCours = null;
+  function jouer(liste) { etapes = liste.slice(); enCours = null; }
+  function avancerSecrets(dt) {
+    while (dt > 0) {
+      if (!enCours) {
+        const e = etapes.shift(); if (!e) return;
+        if (e.faire) { e.faire(); continue; }
+        enCours = { duree: e.duree, t: 0, cibles: e.cibles, depart: Object.fromEntries(Object.keys(e.cibles).map((k) => [k, U[k].value])) };
+      }
+      const pas = Math.min(dt, enCours.duree - enCours.t); enCours.t += pas; dt -= pas;
+      const f = enCours.duree ? enCours.t / enCours.duree : 1, lisse = f * f * (3 - 2 * f);
+      for (const k in enCours.cibles) U[k].value = enCours.depart[k] + (enCours.cibles[k] - enCours.depart[k]) * lisse;
+      if (f >= 1) enCours = null; else return;
+    }
+  }
+  let formeMC = null, formeGrille = null, formeAppli = null;
+  const occupe = () => etapes.length > 0 || enCours;
+
+  // 1. Cinq clics rapides dans le nuage : les initiales
+  let clics = [];
+  addEventListener('pointerdown', (e) => {
+    if (e.target.closest?.('a, button')) return;
+    const t = performance.now();
+    clics = clics.filter((c) => t - c < 1800); clics.push(t);
+    if (clics.length >= 5 && !occupe()) {
+      clics = [];
+      formeMC ??= new THREE.BufferAttribute(initiales(), 3);
+      geo.setAttribute('aSecA', formeMC); geo.setAttribute('aSecB', formeMC);
+      U.uSecK.value = 0; U.uBrule.value = 0;
+      aurore(1, 4);
+      jouer([{ duree: 1.0, cibles: { uSecret: 1 } }, { duree: 2.8, cibles: {} }, { duree: 1.2, cibles: { uSecret: 0 } }]);
+      trouve('initiales', 'Mes initiales');
+    }
+  });
+
+  // 2. Taper « excel » : la grille brûle et renaît en application
+  let frappe = '';
+  addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+    frappe = (frappe + e.key.toLowerCase()).slice(-5);
+    if (frappe === 'excel' && !occupe()) {
+      formeGrille ??= new THREE.BufferAttribute(grille(), 3);
+      formeAppli ??= new THREE.BufferAttribute(semer(formulaire()), 3);
+      geo.setAttribute('aSecA', formeGrille); geo.setAttribute('aSecB', formeAppli);
+      U.uSecK.value = 0; U.uBrule.value = 0;
+      jouer([
+        { duree: 1.0, cibles: { uSecret: 1 } },
+        { duree: 1.4, cibles: {} },
+        { faire: () => aurore(1, 2.6) },
+        { duree: 1.1, cibles: { uBrule: 1 } },
+        { duree: 1.3, cibles: { uBrule: 0, uSecK: 1 } },
+        { duree: 2.2, cibles: {} },
+        { duree: 1.2, cibles: { uSecret: 0 } },
+      ]);
+      trouve('excel', 'De la feuille Excel à l\u2019application');
+    }
+  });
+
+  // 3. Secouer le téléphone : les points s'envolent puis reviennent
+  let derniereSecousse = 0;
+  function secouer(e) {
+    const a = e.acceleration;
+    if (!a || a.x == null) return;
+    const force = Math.hypot(a.x, a.y, a.z), t = performance.now();
+    if (force > 16 && t - derniereSecousse > 1500 && !calme) {
+      derniereSecousse = t;
+      U.uSecousse.value = 1;
+      aurore(1, 1.2);
+      trouve('secousse', 'Le nuage secoué');
+    }
+  }
+
+  // 4. Le message caché pour ceux qui ouvrent les outils de développement
+  console.log('%cVous inspectez le code?', 'font: 700 18px Archivo, sans-serif; color: #c8ff3e');
+  console.log('Moi aussi, j\u2019aime comprendre comment les choses fonctionnent. Écrivez-moi sur LinkedIn : https://www.linkedin.com/in/mamoudou-camara-62b4322ba\nPetit secret : tapez merci() ici.');
+  window.merci = () => {
+    aurore(1, 3);
+    trouve('console', 'Le message dans la console');
+    return 'Merci de votre curiosité! Elle est réciproque.';
+  };
+
+  // Compteur discret : « n secrets trouvés sur 4 » (rien n'est enregistré, il repart à zéro à chaque visite)
+  const trouves = new Set();
+  let annonce = null, minuteur = 0;
+  function trouve(cle, nom) {
+    const nouveau = !trouves.has(cle);
+    trouves.add(cle);
+    if (!annonce) {
+      annonce = document.createElement('div');
+      annonce.className = 'compteur';
+      annonce.setAttribute('role', 'status');
+      document.body.append(annonce);
+    }
+    const n = trouves.size;
+    annonce.innerHTML = `<strong>${nouveau ? 'Secret trouvé' : 'Déjà trouvé'} : ${nom}</strong><span>${n === 4 ? 'Les 4 secrets sont trouvés. Bravo!' : `${n} sur 4. Il en reste ${4 - n} à découvrir.`}</span>`;
+    annonce.classList.add('montre');
+    clearTimeout(minuteur);
+    minuteur = setTimeout(() => annonce.classList.remove('montre'), 4500);
+  }
 
   /* ----- Boucle ----- */
   function image() {
@@ -471,6 +647,12 @@ function demarrer() {
     U.uEclatA.value = A.eclat; U.uEclatB.value = B.eclat;
     U.uSouris.value.lerp(souris, 0.15);
     U.uOnde.value.z = t - debutOnde;
+    avancerSecrets(calme ? 99 : dt);
+    // même place que les formes des projets : à droite sur grand écran, en haut sur mobile
+    U.uSecEch.value = etroit ? Math.min(1.1, vueL / 5.2) : Math.min(1.05, vueL / 10.5);
+    U.uSecPos.value.set(etroit ? 0 : vueL * 0.25, etroit ? vueH * 0.24 : 0, 0);
+    if (auroreTenue > 0) auroreTenue -= dt; else U.uAurore.value *= Math.exp(-dt / 0.9);
+    U.uSecousse.value *= Math.exp(-dt / 0.45);
     const vit = calme ? 0 : Math.min(1, Math.abs(scrollY - dernierY) / Math.max(dt, 0.001) / 3500);
     dernierY = scrollY;
     U.uVitesse.value += (vit - U.uVitesse.value) * 0.12;
