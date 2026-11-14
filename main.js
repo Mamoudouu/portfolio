@@ -336,7 +336,7 @@ function demarrer() {
   }
   function placer(f, pos) {
     if (f.place === 'sol') { pos.set(0, etroit ? -2.5 : -2.2, 0); return 1; }
-    if (etroit) { pos.set(0, vueH * 0.2, 0); return Math.min(0.62, vueL / 4.6); }
+    if (etroit) { pos.set(0, vueH * 0.24, 0); return Math.min(0.8, vueL / 4); } // formes plus grandes sur écran étroit
     pos.set(vueL * 0.24, 0, 0);
     return Math.min(1.0, vueL / 10);
   }
@@ -384,6 +384,69 @@ function demarrer() {
     regard.x = x; regard.y = y;
   });
   document.addEventListener('pointerleave', () => souris.set(99, 99, 0));
+
+  /* ----- Doigt : maintenir puis glisser écarte les points ----- */
+  // Un balayage rapide garde le défilement normal. Si le doigt reste posé un instant
+  // sur la zone de la forme, on passe en « mode toucher » : le défilement est bloqué
+  // le temps du geste et les points s'écartent sous le doigt.
+  let toucher = null; // { x, y, debut, actif, minuteur }
+  const versScene = (cx, cy) => souris.set(((cx / innerWidth) * 2 - 1) * vueL * 0.5, -((cy / innerHeight) * 2 - 1) * vueH * 0.5, 0);
+  addEventListener('touchstart', (e) => {
+    if (calme || e.touches.length !== 1) { toucher = null; return; }
+    const t0 = e.touches[0];
+    if (t0.target.closest?.('a, button')) return;               // les liens restent des liens
+    if (etroit && t0.clientY > innerHeight * 0.6) return;        // sur mobile, seulement sur la zone de la forme
+    toucher = { x: t0.clientX, y: t0.clientY, actif: false };
+    toucher.minuteur = setTimeout(() => {
+      if (!toucher) return;
+      toucher.actif = true;
+      versScene(toucher.x, toucher.y);
+    }, 170);
+  }, { passive: true });
+  addEventListener('touchmove', (e) => {
+    if (!toucher) return;
+    const t0 = e.touches[0];
+    if (!toucher.actif) {
+      // le doigt a bougé avant le délai : c'est un défilement, on laisse faire
+      if (Math.hypot(t0.clientX - toucher.x, t0.clientY - toucher.y) > 10) { clearTimeout(toucher.minuteur); toucher = null; }
+      return;
+    }
+    e.preventDefault();
+    versScene(t0.clientX, t0.clientY);
+  }, { passive: false });
+  const lacher = () => { if (toucher) clearTimeout(toucher.minuteur); toucher = null; souris.set(99, 99, 0); };
+  addEventListener('touchend', lacher);
+  addEventListener('touchcancel', lacher);
+
+  /* ----- Inclinaison du téléphone : la scène pivote ----- */
+  let ampleur = 1, neutre = null;
+  function incliner(e) {
+    if (e.beta == null || e.gamma == null) return;
+    if (!neutre) neutre = { b: e.beta, g: e.gamma }; // la position de départ sert de référence
+    const borne = (v) => Math.max(-1, Math.min(1, v));
+    regard.x = borne((e.gamma - neutre.g) / 25);
+    regard.y = borne(-(e.beta - neutre.b) / 25);
+    ampleur = 3.2; // plus marqué qu'avec la souris : c'est tout le téléphone qui bouge
+  }
+  const tactile = matchMedia('(pointer: coarse)').matches;
+  if (tactile && !calme && 'DeviceOrientationEvent' in window) {
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      // iPhone : Apple exige un geste du visiteur pour autoriser le mouvement
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mouvement';
+      b.textContent = 'Activer le mouvement 3D';
+      b.addEventListener('click', async () => {
+        try {
+          if (await DeviceOrientationEvent.requestPermission() === 'granted') addEventListener('deviceorientation', incliner);
+        } catch (err) { /* refus ou indisponible : la page reste normale */ }
+        b.remove();
+      });
+      document.body.append(b);
+    } else {
+      addEventListener('deviceorientation', incliner);
+    }
+  }
   let debutOnde = -99;
   addEventListener('pointerdown', (e) => {
     if (calme) return;
@@ -412,8 +475,8 @@ function demarrer() {
     dernierY = scrollY;
     U.uVitesse.value += (vit - U.uVitesse.value) * 0.12;
     if (!calme) {
-      camera.position.x += (regard.x * 0.35 - camera.position.x) * 0.04;
-      camera.position.y += (regard.y * 0.2 - camera.position.y) * 0.04;
+      camera.position.x += (regard.x * 0.35 * ampleur - camera.position.x) * 0.05;
+      camera.position.y += (regard.y * 0.2 * ampleur - camera.position.y) * 0.05;
       camera.lookAt(0, 0, 0);
     }
     renderer.render(scene, camera);

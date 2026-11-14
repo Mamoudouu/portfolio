@@ -125,3 +125,10 @@ if (haut) {
     document.querySelector('.nom')?.focus({ preventScroll: true }); // le clavier repart du haut aussi
   });
 }
+
+/* ---------- Indice adapté aux écrans tactiles ---------- */
+if (matchMedia('(pointer: coarse)').matches) {
+  const indice = document.querySelector('.indice');
+  const texte = indice && [...indice.childNodes].reverse().find((n) => n.nodeType === 3 && n.textContent.trim());
+  if (texte) texte.textContent = 'Défilez, puis gardez le doigt sur une forme : les points réagissent';
+}
