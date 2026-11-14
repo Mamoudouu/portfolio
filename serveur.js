@@ -6,6 +6,8 @@ const path = require('node:path');
 
 const racine = __dirname;
 const port = Number(process.env.PORT) || 3300;
+// Par défaut, seul ce Mac voit le site. HOST=0.0.0.0 l'ouvre aux appareils du même Wi-Fi.
+const hote = process.env.HOST || '127.0.0.1';
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.woff2': 'font/woff2' };
 
 http.createServer((req, res) => {
@@ -17,4 +19,11 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': types[path.extname(fichier)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
     res.end(data);
   });
-}).listen(port, '127.0.0.1', () => console.log(`Portfolio : http://localhost:${port}`));
+}).listen(port, hote, () => {
+  console.log(`Portfolio : http://localhost:${port}`);
+  if (hote === '0.0.0.0') {
+    // adresse à taper sur le téléphone (même Wi-Fi)
+    for (const liste of Object.values(require('node:os').networkInterfaces()))
+      for (const a of liste) if (a.family === 'IPv4' && !a.internal) console.log(`Sur votre téléphone : http://${a.address}:${port}`);
+  }
+});
