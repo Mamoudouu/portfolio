@@ -212,12 +212,6 @@ function globe() { // contact : un arc relie Chicoutimi à Conakry
     points.push(chicoutimi.clone().lerp(conakry, f).normalize().multiplyScalar(R * (1 + 0.32 * Math.sin(Math.PI * f))));
   }
   g.add(m(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 80, 0.022, 6), 0, 0, 0, 22));
-  [chicoutimi, conakry].forEach((v) => {
-    g.add(m(new THREE.SphereGeometry(0.1, 16, 12), v.x * R, v.y * R, v.z * R, 30));
-    const halo = m(new THREE.TorusGeometry(0.22, 0.012, 6, 40), v.x * R * 1.01, v.y * R * 1.01, v.z * R * 1.01, 30);
-    halo.lookAt(v.clone().multiplyScalar(3));
-    g.add(halo);
-  });
   g.add(m(new THREE.TorusGeometry(1.75, 0.01, 6, 96), 0, 0, 0, 8)).children.at(-1).rotation.x = Math.PI / 2;
   return g;
 }
