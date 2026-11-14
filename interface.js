@@ -130,5 +130,5 @@ if (haut) {
 if (matchMedia('(pointer: coarse)').matches) {
   const indice = document.querySelector('.indice');
   const texte = indice && [...indice.childNodes].reverse().find((n) => n.nodeType === 3 && n.textContent.trim());
-  if (texte) texte.textContent = 'Défilez, puis gardez le doigt sur une forme : les points réagissent';
+  if (texte) texte.textContent = 'Défilez, touchez les formes : les points réagissent';
 }

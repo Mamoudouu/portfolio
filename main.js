@@ -446,38 +446,19 @@ function demarrer() {
   });
   document.addEventListener('pointerleave', () => souris.set(99, 99, 0));
 
-  /* ----- Doigt : maintenir puis glisser écarte les points ----- */
-  // Un balayage rapide garde le défilement normal. Si le doigt reste posé un instant
-  // sur la zone de la forme, on passe en « mode toucher » : le défilement est bloqué
-  // le temps du geste et les points s'écartent sous le doigt.
-  let toucher = null; // { x, y, debut, actif, minuteur }
+  /* ----- Doigt : les points s'écartent sous le doigt ----- */
+  // On suit le doigt sans jamais bloquer le défilement : la page défile normalement
+  // et les points réagissent en même temps sous le doigt.
   const versScene = (cx, cy) => souris.set(((cx / innerWidth) * 2 - 1) * vueL * 0.5, -((cy / innerHeight) * 2 - 1) * vueH * 0.5, 0);
-  addEventListener('touchstart', (e) => {
-    if (calme || e.touches.length !== 1) { toucher = null; return; }
-    const t0 = e.touches[0];
-    if (t0.target.closest?.('a, button')) return;               // les liens restent des liens
-    if (etroit && t0.clientY > innerHeight * 0.6) return;        // sur mobile, seulement sur la zone de la forme
-    toucher = { x: t0.clientX, y: t0.clientY, actif: false };
-    toucher.minuteur = setTimeout(() => {
-      if (!toucher) return;
-      toucher.actif = true;
-      versScene(toucher.x, toucher.y);
-    }, 170);
-  }, { passive: true });
-  addEventListener('touchmove', (e) => {
-    if (!toucher) return;
-    const t0 = e.touches[0];
-    if (!toucher.actif) {
-      // le doigt a bougé avant le délai : c'est un défilement, on laisse faire
-      if (Math.hypot(t0.clientX - toucher.x, t0.clientY - toucher.y) > 10) { clearTimeout(toucher.minuteur); toucher = null; }
-      return;
-    }
-    e.preventDefault();
-    versScene(t0.clientX, t0.clientY);
-  }, { passive: false });
-  const lacher = () => { if (toucher) clearTimeout(toucher.minuteur); toucher = null; souris.set(99, 99, 0); };
-  addEventListener('touchend', lacher);
-  addEventListener('touchcancel', lacher);
+  const suivreDoigt = (e) => {
+    if (calme || e.touches.length !== 1) return;
+    versScene(e.touches[0].clientX, e.touches[0].clientY);
+  };
+  addEventListener('touchstart', suivreDoigt, { passive: true });
+  addEventListener('touchmove', suivreDoigt, { passive: true });
+  const lacher = () => souris.set(99, 99, 0);
+  addEventListener('touchend', lacher, { passive: true });
+  addEventListener('touchcancel', lacher, { passive: true });
 
   /* ----- Inclinaison du téléphone : la scène pivote ----- */
   let ampleur = 1, neutre = null;
@@ -490,7 +471,8 @@ function demarrer() {
     ampleur = 3.2; // plus marqué qu'avec la souris : c'est tout le téléphone qui bouge
   }
   const tactile = matchMedia('(pointer: coarse)').matches;
-  if (tactile && !calme && 'DeviceOrientationEvent' in window) {
+  // les capteurs de mouvement n'existent que sur une connexion sécurisée (https)
+  if (tactile && !calme && window.isSecureContext && 'DeviceOrientationEvent' in window) {
     if (typeof DeviceOrientationEvent.requestPermission === 'function') {
       // iPhone : Apple exige un geste du visiteur pour autoriser le mouvement
       const b = document.createElement('button');
