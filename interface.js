@@ -106,7 +106,8 @@ if (sourisFine && !calme) {
   document.addEventListener('pointerleave', () => anneau.classList.remove('actif'));
   (function suivre() {
     ax += (cx - ax) * 0.18; ay += (cy - ay) * 0.18;
-    anneau.style.transform = `translate3d(${ax}px,${ay}px,0)`;
+    // propriété « translate » séparée : le changement de taille (scale) ne déplace plus l'anneau
+    anneau.style.translate = `${ax}px ${ay}px`;
     requestAnimationFrame(suivre);
   })();
 }
