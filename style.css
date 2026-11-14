@@ -183,6 +183,9 @@ h1 {
   color: var(--gris); font-size: .9rem;
 }
 
+/* Accroche en deux temps : la promesse, puis qui je suis */
+.chapeau strong { display: block; margin-bottom: .6rem; color: var(--blanc); font-weight: 500; }
+
 /* En bref : ce qu'un recruteur cherche en cinq secondes */
 .bref {
   display: grid; grid-template-columns: max-content 1fr; gap: .9rem 2rem;
