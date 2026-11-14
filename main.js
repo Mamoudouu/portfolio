@@ -347,8 +347,8 @@ function demarrer() {
 
         // un clic lance une onde de choc qui traverse le nuage
         vec2 d2 = p.xy - uOnde.xy;
-        float front = length(d2) - uOnde.z * 7.0;
-        float onde = exp(-front * front * 2.5) * exp(-uOnde.z * 1.3);
+        float front = length(d2) - uOnde.z * 3.2; // vitesse de l'onde (plus petit = plus lent)
+        float onde = exp(-front * front * 2.0) * exp(-uOnde.z * 0.6);
         p.xy += normalize(d2 + 0.0001) * onde * 0.55;
         p.z += onde * 0.9;
 
@@ -500,7 +500,7 @@ function demarrer() {
     const x = (e.clientX / innerWidth) * 2 - 1, y = -((e.clientY / innerHeight) * 2 - 1);
     U.uOnde.value.set(x * vueL * 0.5, y * vueH * 0.5, 0);
     debutOnde = horloge.elapsedTime;
-    aurore(0.9, 0);
+    aurore(0.9, 0.8); // l'aurore dure le temps que l'onde traverse le nuage
   });
   let dernierY = scrollY;
 
