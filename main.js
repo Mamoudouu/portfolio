@@ -198,20 +198,9 @@ function flux() { // nœuds reliés, comme un flux n8n
   return g;
 }
 
-function globe() { // contact : un arc relie Chicoutimi à Conakry
+function globe() { // contact : un globe et son anneau
   const g = new THREE.Group(), R = 1.3;
-  const lieu = (lat, lon) => {
-    const a = THREE.MathUtils.degToRad(lat), o = THREE.MathUtils.degToRad(lon);
-    return new THREE.Vector3(Math.cos(a) * Math.sin(o), Math.sin(a), Math.cos(a) * Math.cos(o));
-  };
-  const chicoutimi = lieu(48.43, -71.07), conakry = lieu(9.54, -13.68);
   g.add(m(new THREE.SphereGeometry(R, 48, 32), 0, 0, 0, 0.55));
-  const points = [];
-  for (let i = 0; i <= 40; i++) {
-    const f = i / 40;
-    points.push(chicoutimi.clone().lerp(conakry, f).normalize().multiplyScalar(R * (1 + 0.32 * Math.sin(Math.PI * f))));
-  }
-  g.add(m(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 80, 0.022, 6), 0, 0, 0, 22));
   g.add(m(new THREE.TorusGeometry(1.75, 0.01, 6, 96), 0, 0, 0, 8)).children.at(-1).rotation.x = Math.PI / 2;
   return g;
 }
