@@ -111,3 +111,17 @@ if (sourisFine && !calme) {
     requestAnimationFrame(suivre);
   })();
 }
+
+/* ---------- Bouton « remonter au début » ---------- */
+const haut = document.querySelector('.haut');
+if (haut) {
+  const montrer = () => haut.classList.toggle('visible', scrollY > innerHeight * 0.8);
+  addEventListener('scroll', montrer, { passive: true });
+  montrer();
+  haut.addEventListener('click', (e) => {
+    e.preventDefault();
+    scrollTo({ top: 0, behavior: calme ? 'auto' : 'smooth' });
+    history.replaceState(null, '', location.pathname); // pas de #haut dans l'adresse
+    document.querySelector('.nom')?.focus({ preventScroll: true }); // le clavier repart du haut aussi
+  });
+}
